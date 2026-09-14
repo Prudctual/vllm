@@ -58,6 +58,17 @@ class StructuredOutputRequest:
                 self._grammar = e
         return True
 
+    def cancel_pending_compile(self) -> None:
+        """Cancel a grammar compile Future that has not finished.
+
+        Aborted requests otherwise leave queued compiles on the shared
+        executor, occupying worker slots indefinitely.
+        """
+        grammar = self._grammar
+        if isinstance(grammar, Future) and not grammar.done():
+            grammar.cancel()
+            self._grammar = None
+
     @property
     def is_grammar_ready(self) -> bool:
         return self._check_grammar_completion()

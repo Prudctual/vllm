@@ -3621,6 +3621,33 @@ def test_grammar_compile_error_finishes_only_request(async_grammar: bool):
     ]
 
 
+def test_free_request_cancels_pending_grammar_compile_future():
+    """Abort must cancel an unfinished grammar compile Future (#53130)."""
+    scheduler = create_scheduler()
+    sampling_params = SamplingParams(
+        max_tokens=16,
+        structured_outputs=StructuredOutputsParams(json='{"type": "object"}'),
+    )
+    sampling_params.update_from_generation_config({}, EOS_TOKEN_ID)
+    request = Request(
+        request_id="pending-grammar",
+        prompt_token_ids=[0, 1],
+        sampling_params=sampling_params,
+        pooling_params=None,
+    )
+    pending: Future[StructuredOutputGrammar] = Future()
+    assert request.structured_output_request is not None
+    request.structured_output_request.grammar = pending
+
+    scheduler.add_request(request)
+    assert request.status == RequestStatus.WAITING_FOR_STRUCTURED_OUTPUT_GRAMMAR
+    scheduler.finish_requests(request.request_id, RequestStatus.FINISHED_ABORTED)
+
+    assert pending.cancelled()
+    assert request.structured_output_request._grammar is None
+    assert request.request_id not in scheduler.requests
+
+
 def test_abort_request_when_structured_output_fsm_cannot_advance():
     scheduler = object.__new__(Scheduler)
     sampling_params = SamplingParams(ignore_eos=True, max_tokens=4)
