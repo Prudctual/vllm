@@ -2582,6 +2582,10 @@ class Scheduler(SchedulerInterface):
     ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
         assert request.is_finished()
 
+        structured_output_request = request.structured_output_request
+        if structured_output_request is not None:
+            structured_output_request.cancel_pending_compile()
+
         self._inflight_prefills.discard(request)
         connector_delay_free_blocks, kv_xfer_params = self._connector_finished(request)
 
